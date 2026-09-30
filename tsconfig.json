@@ -8,8 +8,10 @@
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
      "target": "ES2022",
-    "module": "NodeNext",
-    "types": [],
+    "module": "preserve",
+    "types": [
+      "node"
+    ],
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -43,7 +45,8 @@
     "esModuleInterop": true,
     
 
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
 
     
   },

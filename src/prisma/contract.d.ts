@@ -34,9 +34,8 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'26adfade1e2ccb4c768dcbc69a7670f6f23dcb396dd6b8532de9f9013dea7cd5'>;
-export type ExecutionHash =
-  ExecutionHashBase<'1400dcb658a657496101a44fc18f584c32c978aeea41200acdc5dfa0d2769139'>;
+  StorageHashBase<'95d1023c62ac429319ee058d1b00cd072387515476a2f0857a95d7ed93a24bcb'>;
+export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -251,7 +250,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
 export type FieldOutputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly createdAt: TimestampString<3>;
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerified: CodecTypes['pg/bool@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -261,14 +260,14 @@ export type FieldOutputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['output'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: TimestampString<3>;
     };
   };
 };
 export type FieldInputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamp-string@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerified: CodecTypes['pg/bool@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -278,14 +277,14 @@ export type FieldInputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['input'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamp-string@1']['input'];
     };
   };
 };
 export type StorageColumnTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly createdAt: TimestampString<3>;
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerified: CodecTypes['pg/bool@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -295,14 +294,14 @@ export type StorageColumnTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['output'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: TimestampString<3>;
     };
   };
 };
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamp-string@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerified: CodecTypes['pg/bool@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -312,14 +311,14 @@ export type StorageColumnInputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['input'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamp-string@1']['input'];
     };
   };
 };
 
 export namespace Models {
   export type public_User = {
-    createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    createdAt: TimestampString<3>;
     email: CodecTypes['pg/text@1']['output'];
     emailVerified: CodecTypes['pg/bool@1']['output'];
     id: CodecTypes['pg/int4@1']['output'];
@@ -329,7 +328,7 @@ export namespace Models {
     phoneVerified: CodecTypes['pg/bool@1']['output'];
     role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
     status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-    updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    updatedAt: TimestampString<3>;
     readonly [RelationKeys]?: never;
   };
 }
@@ -361,10 +360,11 @@ type ContractBase = Omit<
             readonly User: {
               columns: {
                 readonly createdAt: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nativeType: 'timestamp';
+                  readonly codecId: 'pg/timestamp-string@1';
                   readonly nullable: false;
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
                 };
                 readonly email: {
                   readonly nativeType: 'text';
@@ -432,9 +432,11 @@ type ContractBase = Omit<
                   };
                 };
                 readonly updatedAt: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nativeType: 'timestamp';
+                  readonly codecId: 'pg/timestamp-string@1';
                   readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                  readonly typeParams: { readonly precision: 3 };
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -478,7 +480,8 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: {
                   readonly kind: 'scalar';
-                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly codecId: 'pg/timestamp-string@1';
+                  readonly typeParams: { readonly precision: 3 };
                 };
               };
               readonly email: {
@@ -521,7 +524,8 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: {
                   readonly kind: 'scalar';
-                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly codecId: 'pg/timestamp-string@1';
+                  readonly typeParams: { readonly precision: 3 };
                 };
               };
             };
@@ -588,22 +592,6 @@ type ContractBase = Omit<
     };
   };
   readonly extensions: {};
-  readonly execution: {
-    readonly executionHash: ExecutionHash;
-    readonly mutations: {
-      readonly defaults: readonly [
-        {
-          readonly onCreate: { readonly id: 'instantNow'; readonly kind: 'generator' };
-          readonly onUpdate: { readonly id: 'instantNow'; readonly kind: 'generator' };
-          readonly ref: {
-            readonly entry: 'User';
-            readonly field: 'updatedAt';
-            readonly namespace: 'public';
-          };
-        },
-      ];
-    };
-  };
   readonly meta: {};
 
   readonly profileHash: ProfileHash;

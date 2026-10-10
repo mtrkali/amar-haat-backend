@@ -34,7 +34,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'95d1023c62ac429319ee058d1b00cd072387515476a2f0857a95d7ed93a24bcb'>;
+  StorageHashBase<'4b7917afb15c81786c921b4f96a79375e9a24c5c1c5fce91cf82e1fc62d10750'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -250,7 +250,7 @@ type DefaultLiteralValue<CodecId extends string, Encoded> = CodecId extends keyo
 export type FieldOutputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: TimestampString<3>;
+      readonly createdAt: TimestamptzString<6>;
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerified: CodecTypes['pg/bool@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -260,14 +260,14 @@ export type FieldOutputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['output'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: TimestampString<3>;
+      readonly updatedAt: TimestamptzString<6>;
     };
   };
 };
 export type FieldInputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerified: CodecTypes['pg/bool@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -277,14 +277,14 @@ export type FieldInputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['input'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
   };
 };
 export type StorageColumnTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: TimestampString<3>;
+      readonly createdAt: TimestamptzString<6>;
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerified: CodecTypes['pg/bool@1']['output'];
       readonly id: CodecTypes['pg/int4@1']['output'];
@@ -294,14 +294,14 @@ export type StorageColumnTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['output'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: TimestampString<3>;
+      readonly updatedAt: TimestamptzString<6>;
     };
   };
 };
 export type StorageColumnInputTypes = {
   readonly public: {
     readonly User: {
-      readonly createdAt: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerified: CodecTypes['pg/bool@1']['input'];
       readonly id: CodecTypes['pg/int4@1']['input'];
@@ -311,14 +311,14 @@ export type StorageColumnInputTypes = {
       readonly phoneVerified: CodecTypes['pg/bool@1']['input'];
       readonly role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
       readonly status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-      readonly updatedAt: CodecTypes['pg/timestamp-string@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
   };
 };
 
 export namespace Models {
   export type public_User = {
-    createdAt: TimestampString<3>;
+    createdAt: TimestamptzString<6>;
     email: CodecTypes['pg/text@1']['output'];
     emailVerified: CodecTypes['pg/bool@1']['output'];
     id: CodecTypes['pg/int4@1']['output'];
@@ -328,7 +328,7 @@ export namespace Models {
     phoneVerified: CodecTypes['pg/bool@1']['output'];
     role: 'CUSTOMER' | 'SELLER' | 'RIDER' | 'ADMIN';
     status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-    updatedAt: TimestampString<3>;
+    updatedAt: TimestamptzString<6>;
     readonly [RelationKeys]?: never;
   };
 }
@@ -360,11 +360,11 @@ type ContractBase = Omit<
             readonly User: {
               columns: {
                 readonly createdAt: {
-                  readonly nativeType: 'timestamp';
-                  readonly codecId: 'pg/timestamp-string@1';
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
                   readonly nullable: false;
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                  readonly typeParams: { readonly precision: 3 };
+                  readonly typeParams: { readonly precision: 6 };
                 };
                 readonly email: {
                   readonly nativeType: 'text';
@@ -432,11 +432,11 @@ type ContractBase = Omit<
                   };
                 };
                 readonly updatedAt: {
-                  readonly nativeType: 'timestamp';
-                  readonly codecId: 'pg/timestamp-string@1';
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-string@1';
                   readonly nullable: false;
                   readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                  readonly typeParams: { readonly precision: 3 };
+                  readonly typeParams: { readonly precision: 6 };
                 };
               };
               primaryKey: { readonly columns: readonly ['id'] };
@@ -480,8 +480,8 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: {
                   readonly kind: 'scalar';
-                  readonly codecId: 'pg/timestamp-string@1';
-                  readonly typeParams: { readonly precision: 3 };
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly typeParams: { readonly precision: 6 };
                 };
               };
               readonly email: {
@@ -524,8 +524,8 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: {
                   readonly kind: 'scalar';
-                  readonly codecId: 'pg/timestamp-string@1';
-                  readonly typeParams: { readonly precision: 3 };
+                  readonly codecId: 'pg/timestamptz-string@1';
+                  readonly typeParams: { readonly precision: 6 };
                 };
               };
             };

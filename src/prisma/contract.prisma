@@ -1,16 +1,17 @@
 // use prisma-8
+
 model User {
-  id            Int                @id @default(autoincrement())
+  id            Int                 @id @default(autoincrement())
   name          String
-  email         String             @unique
-  phone         String             @unique
+  email         String              @unique
+  phone         String              @unique
   passwordHash  String
-  role          UserRole           @default(CUSTOMER)
-  status        UserStatus         @default(ACTIVE)
-  emailVerified Boolean            @default(false)
-  phoneVerified Boolean            @default(false)
-  createdAt     TimestampString(3) @default(now())
-  updatedAt     TimestampString(3) @default(now())
+  role          UserRole            @default(CUSTOMER)
+  status        UserStatus          @default(ACTIVE)
+  emailVerified Boolean             @default(false)
+  phoneVerified Boolean             @default(false)
+  createdAt     TimestamptzString(6) @default(now())
+  updatedAt     TimestamptzString(6) @default(now())
 }
 
 enum UserRole {

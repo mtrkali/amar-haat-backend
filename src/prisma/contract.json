@@ -58,10 +58,10 @@
               "createdAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamp-string@1",
+                  "codecId": "pg/timestamptz-string@1",
                   "kind": "scalar",
                   "typeParams": {
-                    "precision": 3
+                    "precision": 6
                   }
                 }
               },
@@ -143,10 +143,10 @@
               "updatedAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamp-string@1",
+                  "codecId": "pg/timestamptz-string@1",
                   "kind": "scalar",
                   "typeParams": {
-                    "precision": 3
+                    "precision": 6
                   }
                 }
               }
@@ -216,15 +216,15 @@
               ],
               "columns": {
                 "createdAt": {
-                  "codecId": "pg/timestamp-string@1",
+                  "codecId": "pg/timestamptz-string@1",
                   "default": {
                     "expression": "now()",
                     "kind": "function"
                   },
-                  "nativeType": "timestamp",
+                  "nativeType": "timestamptz",
                   "nullable": false,
                   "typeParams": {
-                    "precision": 3
+                    "precision": 6
                   }
                 },
                 "email": {
@@ -305,15 +305,15 @@
                   }
                 },
                 "updatedAt": {
-                  "codecId": "pg/timestamp-string@1",
+                  "codecId": "pg/timestamptz-string@1",
                   "default": {
                     "expression": "now()",
                     "kind": "function"
                   },
-                  "nativeType": "timestamp",
+                  "nativeType": "timestamptz",
                   "nullable": false,
                   "typeParams": {
-                    "precision": 3
+                    "precision": 6
                   }
                 }
               },
@@ -362,7 +362,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "95d1023c62ac429319ee058d1b00cd072387515476a2f0857a95d7ed93a24bcb"
+    "storageHash": "4b7917afb15c81786c921b4f96a79375e9a24c5c1c5fce91cf82e1fc62d10750"
   },
   "capabilities": {
     "postgres": {

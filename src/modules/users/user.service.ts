@@ -108,14 +108,41 @@ const registerUser = async (input: RegisterUserInput) => {
 
     // Create the user in PostgreSQL.
     const now = new Date().toISOString();
-    const user = await (db.orm.public.User as any).create({
-        name,
-        email,
-        phone,
-        passwordHash,
-        createdAt: now,
-        updatedAt: now,
-    });
+
+    let user;
+
+    try {
+        user = await (db.orm.public.User as any).create({
+            name,
+            email,
+            phone,
+            passwordHash,
+            createdAt: now,
+            updatedAt: now,
+        });
+    } catch (error: unknown) {
+        if (typeof error === "object" && error !== null) {
+            const dbError = error as {
+                sqlState?: string;
+                constraint?: string;
+            };
+
+            if (dbError.sqlState === "23505") {
+                const constraint = dbError.constraint?.toLowerCase() ?? "";
+
+                if (constraint.includes("email")) {
+                    throw new Error("EMAIL_ALREADY_EXISTS");
+                }
+
+                if (constraint.includes("phone")) {
+                    throw new Error("PHONE_ALREADY_EXISTS");
+                }
+            }
+        }
+
+        // Preserve all unrelated database errors.
+        throw error;
+    }
 
     // Never return the password hash to the client.
     const {

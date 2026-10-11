@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { userService } from "./user.service.js";
 import type { AuthenticatedRequest } from "../../middleware/auth.middleware.js";
+import { isValidEmail, isValidPhone } from "../../utils/user.funtion.js";
+
 
 const getUser = async (_req: Request, res: Response) => {
     try {
@@ -79,10 +81,30 @@ const registerUser = async (req: Request, res: Response) => {
             });
         }
 
-        if (password.length < 8) {
+        if (!isValidEmail(email.trim())) {
             return res.status(400).json({
                 success: false,
-                message: "Password must be at least 8 characters long",
+                message: "Please provide a valid email address",
+            });
+        }
+
+        if (!isValidPhone(phone.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide a valid phone number",
+            });
+        }
+
+        if (
+            password.length < 8 ||
+            !/[A-Z]/.test(password) ||
+            !/[a-z]/.test(password) ||
+            !/[0-9]/.test(password)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Password must be at least 8 characters long and contain an uppercase letter, a lowercase letter, and a number",
             });
         }
 

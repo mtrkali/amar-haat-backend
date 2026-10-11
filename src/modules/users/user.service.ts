@@ -2,12 +2,16 @@ import bcrypt from "bcryptjs";
 import { db } from "../../prisma/db.js";
 import { generateToken } from "../../utils/jwt.js";
 
+
+
 interface RegisterUserInput {
     name: string;
     email: string;
     phone: string;
     password: string;
 }
+
+
 
 const getUser = async () => {
     const users = await db.orm.public.User

@@ -179,6 +179,16 @@ const loginUser = async (req: Request, res: Response) => {
             });
         }
 
+        if (
+            error instanceof Error &&
+            error.message === "ACCOUNT_NOT_ACTIVE"
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: "Your account is inactive or suspended",
+            });
+        }
+
         console.error("Login failed:", error);
 
         return res.status(500).json({

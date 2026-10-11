@@ -177,6 +177,11 @@ const loginUser = async (input: LoginUserInput) => {
         throw new Error("INVALID_CREDENTIALS");
     }
 
+    // Reject login if the account is not active.
+    if (user.status !== "ACTIVE") {
+        throw new Error("ACCOUNT_NOT_ACTIVE");
+    }
+
     // Compare the submitted password with the stored password hash.
     const isPasswordValid = await bcrypt.compare(
         input.password,

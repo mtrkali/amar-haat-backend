@@ -17,3 +17,7 @@ router.post("/register", userController.registerUser);
 router.post("/login", userController.loginUser);
 
 export const userRoute = router;
+
+
+// "email": "testuser101@example.com",
+//     "password": "TestPass123!"

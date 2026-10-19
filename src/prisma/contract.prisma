@@ -1,18 +1,18 @@
 // use prisma-8
-
 model User {
-  id            Int                 @id @default(autoincrement())
+  id            Int                  @id @default(autoincrement())
   name          String
-  email         String              @unique
-  phone         String              @unique
+  email         String               @unique
+  phone         String               @unique
   passwordHash  String
-  role          UserRole            @default(CUSTOMER)
-  status        UserStatus          @default(ACTIVE)
-  emailVerified Boolean             @default(false)
-  phoneVerified Boolean             @default(false)
+  role          UserRole             @default(CUSTOMER)
+  status        UserStatus           @default(ACTIVE)
+  emailVerified Boolean              @default(false)
+  phoneVerified Boolean              @default(false)
   createdAt     TimestamptzString(6) @default(now())
   updatedAt     TimestamptzString(6) @default(now())
   orders        Order[]
+  reviews       Review[]
   seller        Seller?
 }
 
@@ -30,55 +30,54 @@ enum UserStatus {
 }
 
 // ---------- Catalog ----------
-
 model Category {
-  id        Int      @id @default(autoincrement())
-  slug      String   @unique          // "vegetables-fruits", same as frontend category id
-  name      String                    // "সবজি ও ফল"
+  id        Int       @id @default(autoincrement())
+  slug      String    @unique // "vegetables-fruits", same as frontend category id
+  name      String // "সবজি ও ফল"
   imageUrl  String?
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
   products  Product[]
 }
 
 // A seller shop. One User (role SELLER) owns at most one shop.
 model Seller {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id])
-  slug      String   @unique          // "aliza-farm"
-  shopName  String
-  imageUrl  String?
-  status    SellerStatus @default(PENDING)   // admin approves new shops
-  products  Product[]
+  id       Int          @id @default(autoincrement())
+  userId   Int          @unique
+  user     User         @relation(fields: [userId], references: [id])
+  slug     String       @unique // "aliza-farm"
+  shopName String
+  imageUrl String?
+  status   SellerStatus @default(PENDING) // admin approves new shops
+  products Product[]
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
-  slug        String   @unique        // "tomato", "basmati-rice" (frontend uses this as product id today)
+  id          Int                  @id @default(autoincrement())
+  slug        String               @unique // "tomato", "basmati-rice" (frontend uses this as product id today)
   name        String
   description String?
   categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id])
+  category    Category             @relation(fields: [categoryId], references: [id])
   sellerId    Int?
-  seller      Seller?  @relation(fields: [sellerId], references: [id])
-  price       Int                     // current selling price, in taka
-  oldPrice    Int?                    // struck-through price, optional
-  stock       Int      @default(0)    // replaces the frontend's fixed MAX_QUANTITY = 20
+  seller      Seller?              @relation(fields: [sellerId], references: [id])
+  price       Int // current selling price, in taka
+  oldPrice    Int? // struck-through price, optional
+  stock       Int                  @default(0) // replaces the frontend's fixed MAX_QUANTITY = 20
   imageUrl    String?
-  isActive    Boolean  @default(true) // hide a product without deleting it
+  isActive    Boolean              @default(true) // hide a product without deleting it
   createdAt   TimestamptzString(6) @default(now())
   updatedAt   TimestamptzString(6) @default(now())
   orderItems  OrderItem[]
+  reviews     Review[]
 }
 
 // ---------- Orders ----------
-
 model Order {
-  id            Int      @id @default(autoincrement())
-  orderNumber   String   @unique      // human friendly, e.g. "AH-20261018-0042"
-  userId        Int?                  // null = guest order (the FAQ promises guest checkout)
-  user          User?    @relation(fields: [userId], references: [id])
+  id            Int                  @id @default(autoincrement())
+  orderNumber   String               @unique // human friendly, e.g. "AH-20261018-0042"
+  userId        Int? // null = guest order (the FAQ promises guest checkout)
+  user          User?                @relation(fields: [userId], references: [id])
 
   // Delivery details: same fields as the frontend CheckoutValues
   customerName  String
@@ -90,10 +89,10 @@ model Order {
   note          String?
 
   subtotal      Int
-  deliveryFee   Int      @default(0)
+  deliveryFee   Int                  @default(0)
   total         Int
-  paymentMethod PaymentMethod @default(COD)
-  status        OrderStatus   @default(PENDING)
+  paymentMethod PaymentMethod        @default(COD)
+  status        OrderStatus          @default(PENDING)
 
   createdAt     TimestamptzString(6) @default(now())
   updatedAt     TimestamptzString(6) @default(now())
@@ -103,9 +102,9 @@ model Order {
 // A snapshot of what was bought. Name and price are COPIED at order time,
 // so later price changes or deleted products never rewrite old orders.
 model OrderItem {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   orderId     Int
-  order       Order   @relation(fields: [orderId], references: [id])
+  order       Order    @relation(fields: [orderId], references: [id])
   productId   Int?
   product     Product? @relation(fields: [productId], references: [id])
   productName String
@@ -115,7 +114,6 @@ model OrderItem {
 }
 
 // ---------- Enums ----------
-
 enum SellerStatus {
   PENDING
   APPROVED
@@ -132,4 +130,39 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+}
+
+// ---------- Reviews, FAQ, testimonials (phase 4) ----------
+
+// One review per customer per product, only after a DELIVERED order that contained it.
+// (The "one per product" rule is checked in code, in review.service.ts.)
+model Review {
+  id        Int                  @id @default(autoincrement())
+  productId Int
+  product   Product              @relation(fields: [productId], references: [id])
+  userId    Int
+  user      User                 @relation(fields: [userId], references: [id])
+  rating    Int // 1 to 5
+  comment   String?
+  isVisible Boolean              @default(true) // an admin can hide a review
+  createdAt TimestamptzString(6) @default(now())
+}
+
+model Faq {
+  id        Int     @id @default(autoincrement())
+  question  String
+  answer    String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+}
+
+model Testimonial {
+  id        Int                  @id @default(autoincrement())
+  name      String
+  area      String
+  rating    Int // 1 to 5
+  quote     String
+  sortOrder Int                  @default(0)
+  isActive  Boolean              @default(true)
+  createdAt TimestamptzString(6) @default(now())
 }

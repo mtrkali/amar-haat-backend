@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from "../../middleware/auth.middleware.js";
 import { orderService, OrderError, ORDER_STATUSES } from "./order.service.js";
 import type { OrderStatus } from "./order.service.js";
 import { validateOrderBody } from "./order.validation.js";
+import { paramString } from "../../utils/http.js";
 
 const sendOrderError = (error: unknown, res: Response, fallback: string) => {
     if (error instanceof OrderError) {
@@ -61,7 +62,7 @@ const getMyOrders = async (req: AuthenticatedRequest, res: Response) => {
 
 // GET /orders/track/AH-20261018-483920?phone=01712345678
 const trackOrder = async (req: Request, res: Response) => {
-    const orderNumber = req.params["orderNumber"];
+    const orderNumber = paramString(req.params["orderNumber"]);
     const phone = req.query["phone"];
 
     if (!orderNumber || typeof phone !== "string" || !phone) {

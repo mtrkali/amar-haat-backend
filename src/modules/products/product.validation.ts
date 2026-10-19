@@ -31,16 +31,17 @@ export const validateProductBody = (
         return { ok: false, errors: { body: "Request body is required." } };
     }
 
+    const data: Record<string, unknown> = body;
     const errors: Record<string, string> = {};
     const value: ProductInput = {};
-    const has = (key: string) => body[key] !== undefined;
+    const has = (key: string) => data[key] !== undefined;
     const need = (key: string) => mode === "create" && !has(key);
 
     // slug: set once at creation, never changed (links and old orders depend on it)
     if (mode === "update" && has("slug")) {
         errors["slug"] = "Slug cannot be changed.";
     } else if (has("slug")) {
-        const slug = body["slug"];
+        const slug = data["slug"];
 
         if (typeof slug !== "string" || !SLUG_PATTERN.test(slug) || slug.length > 60 || RESERVED_SLUGS.includes(slug)) {
             errors["slug"] = "Slug must be lowercase English letters, digits and dashes (for example: red-tomato).";
@@ -52,7 +53,7 @@ export const validateProductBody = (
     }
 
     if (has("name")) {
-        const name = typeof body["name"] === "string" ? body["name"].trim().replace(/\s+/g, " ") : "";
+        const name = typeof data["name"] === "string" ? data["name"].trim().replace(/\s+/g, " ") : "";
 
         if (name.length < 2 || name.length > 120) {
             errors["name"] = "Name must be 2 to 120 characters.";
@@ -64,7 +65,7 @@ export const validateProductBody = (
     }
 
     if (has("description")) {
-        const d = body["description"];
+        const d = data["description"];
 
         if (d === null || d === "") {
             value.description = null;
@@ -76,7 +77,7 @@ export const validateProductBody = (
     }
 
     if (has("categorySlug")) {
-        const c = body["categorySlug"];
+        const c = data["categorySlug"];
 
         if (typeof c === "string" && c.trim()) {
             value.categorySlug = c.trim();
@@ -88,7 +89,7 @@ export const validateProductBody = (
     }
 
     if (has("price")) {
-        const p = body["price"];
+        const p = data["price"];
 
         if (typeof p === "number" && Number.isInteger(p) && p >= 1 && p <= 10_000_000) {
             value.price = p;
@@ -100,7 +101,7 @@ export const validateProductBody = (
     }
 
     if (has("oldPrice")) {
-        const p = body["oldPrice"];
+        const p = data["oldPrice"];
 
         if (p === null) {
             value.oldPrice = null;
@@ -112,7 +113,7 @@ export const validateProductBody = (
     }
 
     if (has("stock")) {
-        const s = body["stock"];
+        const s = data["stock"];
 
         if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s <= 1_000_000) {
             value.stock = s;
@@ -124,7 +125,7 @@ export const validateProductBody = (
     }
 
     if (has("imageUrl")) {
-        const u = body["imageUrl"];
+        const u = data["imageUrl"];
 
         if (u === null || u === "") {
             value.imageUrl = null;
@@ -136,15 +137,15 @@ export const validateProductBody = (
     }
 
     if (has("isActive")) {
-        if (typeof body["isActive"] === "boolean") {
-            value.isActive = body["isActive"];
+        if (typeof data["isActive"] === "boolean") {
+            value.isActive = data["isActive"];
         } else {
             errors["isActive"] = "isActive must be true or false.";
         }
     }
 
     if (mode === "create" && has("sellerId")) {
-        const s = body["sellerId"];
+        const s = data["sellerId"];
 
         if (s === null || (typeof s === "number" && Number.isInteger(s) && s >= 1)) {
             value.sellerId = s;

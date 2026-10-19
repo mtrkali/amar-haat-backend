@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { db } from "../../prisma/db.js";
 import type { ValidatedOrder } from "./order.validation.js";
 import { normalizePhone } from "./order.validation.js";
+import { timestamp } from "../../utils/http.js";
 
 // TODO: decide the real delivery fee (flat, or per upazila). 0 for now.
 export const DELIVERY_FEE = 0;
@@ -73,9 +74,11 @@ const getItems = async (orderId: number) =>
         .select(...ITEM_FIELDS)
         .all();
 
-const newestFirst = <T extends { createdAt: string }>(rows: T[]): T[] =>
+const newestFirst = <T extends { createdAt: unknown }>(rows: T[]): T[] =>
     [...rows].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        (a, b) =>
+            new Date(String(b.createdAt)).getTime() -
+            new Date(String(a.createdAt)).getTime()
     );
 
 // "AH-20261018-483920": easy to read out over the phone.
@@ -132,7 +135,7 @@ const createOrder = async (input: ValidatedOrder, userId: number | null) => {
     // Step 2: totals.
     const subtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
     const total = subtotal + DELIVERY_FEE;
-    const now = new Date().toISOString();
+    const now = timestamp();
 
     // Step 3: create the order (retry if the random order number is already taken).
     let order: { id: number } | undefined;
@@ -193,7 +196,7 @@ const createOrder = async (input: ValidatedOrder, userId: number | null) => {
         await db.orm.public.Order
             .where({ id: orderId })
             .select("id")
-            .update({ status: "CANCELLED", updatedAt: new Date().toISOString() });
+            .update({ status: "CANCELLED", updatedAt: timestamp() });
 
         throw error;
     }
@@ -278,7 +281,7 @@ const updateOrderStatus = async (orderId: number, newStatus: OrderStatus) => {
         );
     }
 
-    const now = new Date().toISOString();
+    const now = timestamp();
 
     await db.orm.public.Order
         .where({ id: orderId })

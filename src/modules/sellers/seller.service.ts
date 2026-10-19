@@ -1,4 +1,5 @@
 import { db } from "../../prisma/db.js";
+import { timestamp } from "../../utils/http.js";
 
 export type SellerStatus = "PENDING" | "APPROVED" | "SUSPENDED";
 
@@ -111,7 +112,7 @@ const updateSellerStatus = async (sellerId: number, status: SellerStatus) => {
             .select("id")
             .update({
                 role: status === "APPROVED" ? "SELLER" : "CUSTOMER",
-                updatedAt: new Date().toISOString(),
+                updatedAt: timestamp(),
             });
     }
 

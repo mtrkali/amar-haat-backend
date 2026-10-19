@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from "../../middleware/auth.middleware.js";
 import { productService, ProductError } from "./product.service.js";
 import type { Actor } from "./product.service.js";
 import { validateProductBody } from "./product.validation.js";
+import { paramString } from "../../utils/http.js";
 
 const sendProductError = (error: unknown, res: Response, fallback: string) => {
     if (error instanceof ProductError) {
@@ -46,7 +47,7 @@ const getProducts = async (req: Request, res: Response) => {
 };
 
 const getProductBySlug = async (req: Request, res: Response) => {
-    const slug = req.params["slug"];
+    const slug = paramString(req.params["slug"]);
 
     if (!slug) {
         return res.status(400).json({

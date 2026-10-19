@@ -67,11 +67,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const validateOrderBody = (body: unknown): OrderValidationResult => {
     const errors: Record<string, string> = {};
 
-    if (!isRecord(body) || !isRecord(body["customer"])) {
+    const customer = isRecord(body) ? body["customer"] : undefined;
+
+    if (!isRecord(body) || !isRecord(customer)) {
         return { ok: false, errors: { customer: "Customer details are required." } };
     }
-
-    const customer = body["customer"];
 
     const name = text(customer["name"]).trim().replace(/\s+/g, " ");
     const phone = normalizePhone(text(customer["phone"]));

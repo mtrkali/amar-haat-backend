@@ -6,6 +6,8 @@ import { categoryRoute } from "./modules/categories/category.router.js";
 import { productRoute } from "./modules/products/product.router.js";
 import { orderRoute } from "./modules/orders/order.router.js";
 import { sellerRoute } from "./modules/sellers/seller.router.js";
+import { productReviewRoute, reviewAdminRoute } from "./modules/reviews/review.router.js";
+import { faqRoute, testimonialRoute } from "./modules/contents/content.router.js";
 
 const app = express();
 
@@ -28,7 +30,11 @@ app.use(express.json());
 app.use("/health", healthRoute);
 app.use("/users", userRoute);
 app.use("/categories", categoryRoute);
+app.use("/products", productReviewRoute);
 app.use("/products", productRoute);
+app.use("/reviews", reviewAdminRoute);
+app.use("/faqs", faqRoute);
+app.use("/testimonials", testimonialRoute);
 app.use("/orders", orderRoute);
 app.use("/sellers", sellerRoute);
 

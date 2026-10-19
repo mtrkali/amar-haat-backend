@@ -1,8 +1,10 @@
 import { db } from "../../prisma/db.js";
 import type { ProductInput } from "./product.validation.js";
+import { reviewService } from "../reviews/review.service.js";
+import { timestamp } from "../../utils/http.js";
 
-// Fields sent to the storefront. Rating and review count are not here yet:
-// they will come from a Review table in a later phase.
+// Fields sent to the storefront. Rating and review count are added on top of these,
+// worked out from the Review table.
 const PRODUCT_FIELDS = [
     "id",
     "slug",
@@ -59,10 +61,15 @@ const getProducts = async (categorySlug?: string) => {
         .select(...PRODUCT_FIELDS)
         .all();
 
+    // Rating and review count come from the visible customer reviews.
+    const summaries = await reviewService.getRatingSummaries();
+
     const data = products
         .map(({ categoryId, ...product }) => ({
             ...product,
             categorySlug: slugById.get(categoryId) ?? null,
+            rating: summaries.get(product.id)?.rating ?? 0,
+            reviewCount: summaries.get(product.id)?.reviewCount ?? 0,
         }))
         .filter((product) => !categorySlug || product.categorySlug === categorySlug);
 
@@ -80,11 +87,17 @@ const getProductBySlug = async (slug: string) => {
     }
 
     const slugById = await getCategorySlugMap();
+    const summaries = await reviewService.getRatingSummaries();
     const { categoryId, isActive: _isActive, ...rest } = product;
 
     return {
         success: true,
-        data: { ...rest, categorySlug: slugById.get(categoryId) ?? null },
+        data: {
+            ...rest,
+            categorySlug: slugById.get(categoryId) ?? null,
+            rating: summaries.get(rest.id)?.rating ?? 0,
+            reviewCount: summaries.get(rest.id)?.reviewCount ?? 0,
+        },
     };
 };
 
@@ -243,7 +256,7 @@ const updateProduct = async (productId: number, input: ProductInput, actor: Acto
         ...(input.stock !== undefined && { stock: input.stock }),
         ...(input.imageUrl !== undefined && { imageUrl: input.imageUrl }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
-        updatedAt: new Date().toISOString(),
+        updatedAt: timestamp(),
     };
 
     await db.orm.public.Product

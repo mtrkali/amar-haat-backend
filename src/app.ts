@@ -5,6 +5,7 @@ import { userRoute } from "./modules/users/user.router.js";
 import { categoryRoute } from "./modules/categories/category.router.js";
 import { productRoute } from "./modules/products/product.router.js";
 import { orderRoute } from "./modules/orders/order.router.js";
+import { sellerRoute } from "./modules/sellers/seller.router.js";
 
 const app = express();
 
@@ -29,5 +30,6 @@ app.use("/users", userRoute);
 app.use("/categories", categoryRoute);
 app.use("/products", productRoute);
 app.use("/orders", orderRoute);
+app.use("/sellers", sellerRoute);
 
 export default app;

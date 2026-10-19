@@ -60,6 +60,111 @@ const getMyProfile = async (
 };
 
 
+const updateMyProfile = async (
+    req: AuthenticatedRequest,
+    res: Response
+) => {
+    try {
+        const userId = req.userId;
+
+        // Ensure the user is authenticated.
+        if (typeof userId !== "number") {
+            return res.status(401).json({
+                success: false,
+                message: "Authentication required",
+            });
+        }
+
+        const { name, phone } = req.body;
+
+        // Reject attempts to update protected fields.
+        const restrictedFields = [
+            "email",
+            "password",
+            "passwordHash",
+            "role",
+            "status",
+            "emailVerified",
+            "phoneVerified",
+        ];
+
+        const attemptedRestrictedField = restrictedFields.some(
+            (field) =>
+                Object.prototype.hasOwnProperty.call(req.body, field)
+        );
+
+        if (attemptedRestrictedField) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "You can only update your name and phone number",
+            });
+        }
+
+        // Validate the name if provided.
+        if (name !== undefined) {
+            if (typeof name !== "string" || !name.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Name must be a non-empty string",
+                });
+            }
+        }
+
+        // Validate the phone number if provided.
+        if (phone !== undefined) {
+            if (
+                typeof phone !== "string" ||
+                !isValidPhone(phone.trim())
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Please provide a valid phone number",
+                });
+            }
+        }
+
+        // Require at least one field to update.
+        if (name === undefined && phone === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: "Provide a name or phone number to update",
+            });
+        }
+
+        // Update the authenticated user's profile.
+        const result = await userService.updateMyProfile(userId, {
+            ...(name !== undefined && { name: name.trim() }),
+            ...(phone !== undefined && { phone: phone.trim() }),
+        });
+
+        return res.status(200).json(result);
+    } catch (error) {
+        if (error instanceof Error) {
+            if (error.message === "USER_NOT_FOUND") {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found",
+                });
+            }
+
+            if (error.message === "PHONE_ALREADY_EXISTS") {
+                return res.status(409).json({
+                    success: false,
+                    message: "Phone number is already registered",
+                });
+            }
+        }
+
+        console.error("Profile update failed:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update profile",
+        });
+    }
+};
+
 const registerUser = async (req: Request, res: Response) => {
     try {
         const { name, email, phone, password } = req.body;
@@ -203,5 +308,6 @@ export const userController = {
     getUser,
     registerUser,
     loginUser,
-    getMyProfile
+    getMyProfile,
+    updateMyProfile,
 };

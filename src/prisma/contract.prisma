@@ -12,6 +12,8 @@ model User {
   phoneVerified Boolean             @default(false)
   createdAt     TimestamptzString(6) @default(now())
   updatedAt     TimestamptzString(6) @default(now())
+  orders        Order[]
+  seller        Seller?
 }
 
 enum UserRole {
@@ -25,4 +27,109 @@ enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+}
+
+// ---------- Catalog ----------
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique          // "vegetables-fruits", same as frontend category id
+  name      String                    // "সবজি ও ফল"
+  imageUrl  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  products  Product[]
+}
+
+// A seller shop. One User (role SELLER) owns at most one shop.
+model Seller {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  slug      String   @unique          // "aliza-farm"
+  shopName  String
+  imageUrl  String?
+  status    SellerStatus @default(PENDING)   // admin approves new shops
+  products  Product[]
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique        // "tomato", "basmati-rice" (frontend uses this as product id today)
+  name        String
+  description String?
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  sellerId    Int?
+  seller      Seller?  @relation(fields: [sellerId], references: [id])
+  price       Int                     // current selling price, in taka
+  oldPrice    Int?                    // struck-through price, optional
+  stock       Int      @default(0)    // replaces the frontend's fixed MAX_QUANTITY = 20
+  imageUrl    String?
+  isActive    Boolean  @default(true) // hide a product without deleting it
+  createdAt   TimestamptzString(6) @default(now())
+  updatedAt   TimestamptzString(6) @default(now())
+  orderItems  OrderItem[]
+}
+
+// ---------- Orders ----------
+
+model Order {
+  id            Int      @id @default(autoincrement())
+  orderNumber   String   @unique      // human friendly, e.g. "AH-20261018-0042"
+  userId        Int?                  // null = guest order (the FAQ promises guest checkout)
+  user          User?    @relation(fields: [userId], references: [id])
+
+  // Delivery details: same fields as the frontend CheckoutValues
+  customerName  String
+  customerPhone String
+  upazila       String
+  union         String
+  ward          Int?
+  address       String
+  note          String?
+
+  subtotal      Int
+  deliveryFee   Int      @default(0)
+  total         Int
+  paymentMethod PaymentMethod @default(COD)
+  status        OrderStatus   @default(PENDING)
+
+  createdAt     TimestamptzString(6) @default(now())
+  updatedAt     TimestamptzString(6) @default(now())
+  items         OrderItem[]
+}
+
+// A snapshot of what was bought. Name and price are COPIED at order time,
+// so later price changes or deleted products never rewrite old orders.
+model OrderItem {
+  id          Int     @id @default(autoincrement())
+  orderId     Int
+  order       Order   @relation(fields: [orderId], references: [id])
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  productName String
+  unitPrice   Int
+  quantity    Int
+  lineTotal   Int
+}
+
+// ---------- Enums ----------
+
+enum SellerStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+}
+
+enum PaymentMethod {
+  COD
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
 }

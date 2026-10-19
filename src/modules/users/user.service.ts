@@ -11,6 +11,10 @@ interface RegisterUserInput {
     password: string;
 }
 
+interface UpdateMyProfileInput {
+    name?: string;
+    phone?: string;
+}
 
 
 const getUser = async () => {
@@ -211,10 +215,69 @@ const loginUser = async (input: LoginUserInput) => {
 };
 
 
+const updateMyProfile = async (
+    userId: number,
+    input: UpdateMyProfileInput
+) => {
+    // Check whether the user exists.
+    const existingUser = await db.orm.public.User
+        .where({ id: userId })
+        .first();
+
+    if (!existingUser) {
+        throw new Error("USER_NOT_FOUND");
+    }
+
+    // Check whether the phone number is already registered.
+    if (input.phone !== undefined) {
+        const existingPhone = await db.orm.public.User
+            .where({ phone: input.phone })
+            .first();
+
+        if (existingPhone && existingPhone.id !== userId) {
+            throw new Error("PHONE_ALREADY_EXISTS");
+        }
+    }
+
+    // Prepare only the fields that can be updated.
+    const updateData = {
+        ...(input.name !== undefined && { name: input.name }),
+        ...(input.phone !== undefined && { phone: input.phone }),
+    };
+
+    // Update only the authenticated user's record.
+    const updatedUser = await db.orm.public.User
+        .where({ id: userId })
+        .select(
+            "id",
+            "name",
+            "email",
+            "phone",
+            "role",
+            "status",
+            "emailVerified",
+            "phoneVerified",
+            "createdAt",
+            "updatedAt"
+        )
+        .update(updateData);
+
+    if (!updatedUser) {
+        throw new Error("USER_NOT_FOUND");
+    }
+
+    return {
+        success: true,
+        message: "Profile updated successfully",
+        data: updatedUser,
+    };
+};
+
 export const userService = {
     getUser,
     registerUser,
     loginUser,
     getUserById,
     getUserRoleById,
+    updateMyProfile,
 };

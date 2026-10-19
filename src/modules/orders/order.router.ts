@@ -1,7 +1,7 @@
 import express from "express";
 import { orderController } from "./order.controller.js";
 import { authenticate } from "../../middleware/auth.middleware.js";
-import { optionalAuthenticate } from "../../middleware/optionalauth.middleware";
+import { optionalAuthenticate } from "../../middleware/optionalauth.middleware.js";
 
 const router = express.Router();
 

@@ -46,6 +46,18 @@ const getCategorySlugMap = async () => {
     return new Map(categories.map((category) => [category.id, category.slug]));
 };
 
+const getCategoryNameMap = async () => {
+    const categories = await db.orm.public.Category
+        .select("id", "name")
+        .all();
+
+    return new Map(categories.map((category) => [category.id, category.name]));
+};
+
+// Lower-case and tidy the spaces, so "  Tomato " matches "tomato".
+const normalizeSearch = (text: string): string =>
+    text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+
 const isUniqueViolation = (error: unknown): boolean =>
     typeof error === "object" &&
     error !== null &&
@@ -53,13 +65,36 @@ const isUniqueViolation = (error: unknown): boolean =>
 
 // ---------- Public (storefront) ----------
 
-const getProducts = async (categorySlug?: string) => {
+// `search` is optional. Every word must appear in the product name, its description,
+// or its category (name or slug). "টমেটো তাজা" finds products that match both words.
+const getProducts = async (categorySlug?: string, search?: string) => {
     const slugById = await getCategorySlugMap();
 
-    const products = await db.orm.public.Product
+    const allProducts = await db.orm.public.Product
         .where({ isActive: true })
         .select(...PRODUCT_FIELDS)
         .all();
+
+    const words = normalizeSearch(search ?? "").split(" ").filter(Boolean);
+
+    let products = allProducts;
+
+    if (words.length > 0) {
+        const nameById = await getCategoryNameMap();
+
+        products = allProducts.filter((product) => {
+            const text = normalizeSearch(
+                [
+                    product.name,
+                    product.description ?? "",
+                    nameById.get(product.categoryId) ?? "",
+                    slugById.get(product.categoryId) ?? "",
+                ].join(" ")
+            );
+
+            return words.every((word) => text.includes(word));
+        });
+    }
 
     // Rating and review count come from the visible customer reviews.
     const summaries = await reviewService.getRatingSummaries();

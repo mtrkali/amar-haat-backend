@@ -34,13 +34,19 @@ const getActor = (req: AuthenticatedRequest): Actor | null =>
 
 const getProducts = async (req: Request, res: Response) => {
     try {
-        // Optional filter: GET /products?category=vegetables-fruits
+        // Optional filters: GET /products?category=vegetables-fruits&q=tomato
         const category =
             typeof req.query["category"] === "string" && req.query["category"]
                 ? req.query["category"]
                 : undefined;
 
-        return res.status(200).json(await productService.getProducts(category));
+        // Search words. Capped, so a very long text cannot slow the search down.
+        const search =
+            typeof req.query["q"] === "string" && req.query["q"].trim()
+                ? req.query["q"].trim().slice(0, 100)
+                : undefined;
+
+        return res.status(200).json(await productService.getProducts(category, search));
     } catch (error) {
         return sendProductError(error, res, "Failed to fetch products");
     }

@@ -12,6 +12,7 @@ router.post("/", optionalAuthenticate, orderController.createOrder);
 router.get("/my", authenticate(), orderController.getMyOrders);
 
 // Guests look up an order with its number and phone number.
+router.get("/track/token", orderController.trackOrderByToken);
 router.get("/track/:orderNumber", orderController.trackOrder);
 
 // Admin only.

@@ -4,6 +4,7 @@ import { orderService, OrderError, ORDER_STATUSES } from "./order.service.js";
 import type { OrderStatus } from "./order.service.js";
 import { validateOrderBody } from "./order.validation.js";
 import { paramString } from "../../utils/http.js";
+import { businessConfig } from "../../config/business.js";
 
 const sendOrderError = (error: unknown, res: Response, fallback: string) => {
     if (error instanceof OrderError) {
@@ -24,6 +25,31 @@ const sendOrderError = (error: unknown, res: Response, fallback: string) => {
     return res.status(500).json({ success: false, message: fallback });
 };
 
+// The browser sends one random key per checkout attempt, for example a UUID.
+// 16 to 64 letters, digits, "-" or "_" is enough room for a UUID and nothing dangerous.
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
+const readIdempotencyKey = (
+    req: Request
+): { ok: true; key: string | null } | { ok: false; message: string } => {
+    const header = req.header("idempotency-key");
+
+    if (header === undefined || header === "") {
+        return businessConfig.idempotencyRequired
+            ? { ok: false, message: "The Idempotency-Key header is required" }
+            : { ok: true, key: null };
+    }
+
+    if (!IDEMPOTENCY_KEY_PATTERN.test(header)) {
+        return {
+            ok: false,
+            message: "Idempotency-Key must be 16 to 64 letters, digits, '-' or '_'",
+        };
+    }
+
+    return { ok: true, key: header };
+};
+
 // Works for guests and logged-in users. A logged-in user's order is linked to the account.
 const createOrder = async (req: AuthenticatedRequest, res: Response) => {
     const validation = validateOrderBody(req.body);
@@ -36,13 +62,25 @@ const createOrder = async (req: AuthenticatedRequest, res: Response) => {
         });
     }
 
+    const idempotency = readIdempotencyKey(req);
+
+    if (!idempotency.ok) {
+        return res.status(400).json({ success: false, message: idempotency.message });
+    }
+
     try {
-        const result = await orderService.createOrder(
+        const { replayed, ...result } = await orderService.createOrder(
             validation.value,
-            typeof req.userId === "number" ? req.userId : null
+            typeof req.userId === "number" ? req.userId : null,
+            idempotency.key
         );
 
-        return res.status(201).json({ ...result, message: "Order placed successfully" });
+        // 201 for a new order. 200 when the same request was repeated and the earlier order is returned.
+        return res.status(replayed ? 200 : 201).json({
+            ...result,
+            replayed,
+            message: replayed ? "Order was already placed" : "Order placed successfully",
+        });
     } catch (error) {
         return sendOrderError(error, res, "Failed to place order");
     }
@@ -74,6 +112,18 @@ const trackOrder = async (req: Request, res: Response) => {
 
     try {
         return res.status(200).json(await orderService.trackOrder(orderNumber, phone));
+    } catch (error) {
+        return sendOrderError(error, res, "Failed to fetch order");
+    }
+};
+
+const trackOrderByToken = async (req: Request, res: Response) => {
+    const token = req.query["token"];
+    if (typeof token !== "string" || !token) {
+        return res.status(400).json({ success: false, message: "Tracking token is required" });
+    }
+    try {
+        return res.status(200).json(await orderService.trackOrderByToken(token));
     } catch (error) {
         return sendOrderError(error, res, "Failed to fetch order");
     }
@@ -115,6 +165,7 @@ export const orderController = {
     createOrder,
     getMyOrders,
     trackOrder,
+    trackOrderByToken,
     getAllOrders,
     updateOrderStatus,
 };

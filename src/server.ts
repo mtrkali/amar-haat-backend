@@ -2,8 +2,19 @@ import dns from "node:dns";
 import dotenv from "dotenv";
 import app from "./app.js";
 
-// Google DNS configuration
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+// DNS servers. Some home networks cannot resolve the Neon database host, so local development
+// keeps using Google DNS as before. In production (Render) the platform DNS is used, unless
+// DNS_SERVERS is set, for example DNS_SERVERS="8.8.8.8,8.8.4.4".
+const customDns = process.env["DNS_SERVERS"]
+    ?.split(",")
+    .map((server) => server.trim())
+    .filter(Boolean);
+
+if (customDns && customDns.length > 0) {
+    dns.setServers(customDns);
+} else if (process.env["NODE_ENV"] !== "production") {
+    dns.setServers(["8.8.8.8", "8.8.4.4"]);
+}
 
 dotenv.config();
 

@@ -15,6 +15,7 @@ const PRODUCT_FIELDS = [
     "oldPrice",
     "stock",
     "imageUrl",
+    "sellerId",
 ] as const;
 
 // What an admin or seller sees: the public fields plus the hidden ones.
@@ -54,6 +55,11 @@ const getCategoryNameMap = async () => {
     return new Map(categories.map((category) => [category.id, category.name]));
 };
 
+const getSellerNameMap = async () => {
+    const sellers = await db.orm.public.Seller.select("id", "shopName").all();
+    return new Map(sellers.map((seller) => [seller.id, seller.shopName]));
+};
+
 // Lower-case and tidy the spaces, so "  Tomato " matches "tomato".
 const normalizeSearch = (text: string): string =>
     text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
@@ -69,6 +75,7 @@ const isUniqueViolation = (error: unknown): boolean =>
 // or its category (name or slug). "টমেটো তাজা" finds products that match both words.
 const getProducts = async (categorySlug?: string, search?: string) => {
     const slugById = await getCategorySlugMap();
+    const sellerNameById = await getSellerNameMap();
 
     const allProducts = await db.orm.public.Product
         .where({ isActive: true })
@@ -102,6 +109,7 @@ const getProducts = async (categorySlug?: string, search?: string) => {
     const data = products
         .map(({ categoryId, ...product }) => ({
             ...product,
+            sellerName: product.sellerId === null ? null : sellerNameById.get(product.sellerId) ?? null,
             categorySlug: slugById.get(categoryId) ?? null,
             rating: summaries.get(product.id)?.rating ?? 0,
             reviewCount: summaries.get(product.id)?.reviewCount ?? 0,
@@ -122,6 +130,7 @@ const getProductBySlug = async (slug: string) => {
     }
 
     const slugById = await getCategorySlugMap();
+    const sellerNameById = await getSellerNameMap();
     const summaries = await reviewService.getRatingSummaries();
     const { categoryId, isActive: _isActive, ...rest } = product;
 
@@ -129,6 +138,7 @@ const getProductBySlug = async (slug: string) => {
         success: true,
         data: {
             ...rest,
+            sellerName: rest.sellerId === null ? null : sellerNameById.get(rest.sellerId) ?? null,
             categorySlug: slugById.get(categoryId) ?? null,
             rating: summaries.get(rest.id)?.rating ?? 0,
             reviewCount: summaries.get(rest.id)?.reviewCount ?? 0,

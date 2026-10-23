@@ -8,3 +8,5 @@ dist/
 .claude/
 .cursor/
 .devin/
+
+env.example.additions

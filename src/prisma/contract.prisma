@@ -12,8 +12,11 @@ model User {
   createdAt     TimestamptzString(6) @default(now())
   updatedAt     TimestamptzString(6) @default(now())
   orders        Order[]
+  orderGroups   OrderGroup[]
   reviews       Review[]
   seller        Seller?
+  rider         RiderProfile?
+  addresses     Address[]
 }
 
 enum UserRole {
@@ -31,25 +34,36 @@ enum UserStatus {
 
 // ---------- Catalog ----------
 model Category {
-  id        Int       @id @default(autoincrement())
-  slug      String    @unique // "vegetables-fruits", same as frontend category id
-  name      String // "সবজি ও ফল"
-  imageUrl  String?
-  sortOrder Int       @default(0)
-  isActive  Boolean   @default(true)
-  products  Product[]
+  id          Int       @id @default(autoincrement())
+  slug        String    @unique // "vegetables-fruits", same as frontend category id
+  name        String // "সবজি ও ফল"
+  imageUrl    String?
+  description String?
+  // Parent category, for sub-categories. A foreign key exists in the database (sql/002);
+  // it is kept as a plain column here, so no self-relation is declared.
+  parentId    Int?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  products    Product[]
 }
 
 // A seller shop. One User (role SELLER) owns at most one shop.
 model Seller {
-  id       Int          @id @default(autoincrement())
-  userId   Int          @unique
-  user     User         @relation(fields: [userId], references: [id])
-  slug     String       @unique // "aliza-farm"
-  shopName String
-  imageUrl String?
-  status   SellerStatus @default(PENDING) // admin approves new shops
-  products Product[]
+  id            Int                @id @default(autoincrement())
+  userId        Int                @unique
+  user          User               @relation(fields: [userId], references: [id])
+  slug          String             @unique // "aliza-farm"
+  shopName      String
+  imageUrl      String?
+  status        SellerStatus       @default(PENDING) // admin approves new shops
+  phone         String?
+  address       String?
+  description   String?
+  // This seller's own commission rate in basis points (100 = 1%). Empty = use the default rate.
+  commissionBps Int?
+  products      Product[]
+  orders        Order[]
+  commissions   CommissionRecord[]
 }
 
 model Product {
@@ -74,29 +88,46 @@ model Product {
 
 // ---------- Orders ----------
 model Order {
-  id            Int                  @id @default(autoincrement())
-  orderNumber   String               @unique // human friendly, e.g. "AH-20261018-0042"
-  userId        Int? // null = guest order (the FAQ promises guest checkout)
-  user          User?                @relation(fields: [userId], references: [id])
+  id             Int                  @id @default(autoincrement())
+  orderNumber    String               @unique // human friendly, e.g. "AH-20261018-0042"
+  userId         Int? // null = guest order (the FAQ promises guest checkout)
+  user           User?                @relation(fields: [userId], references: [id])
+
+  // One checkout = one OrderGroup = one Order per seller.
+  // Empty only for orders made before step 3 starts writing groups.
+  groupId        Int?
+  group          OrderGroup?          @relation(fields: [groupId], references: [id])
+  sellerId       Int?
+  seller         Seller?              @relation(fields: [sellerId], references: [id])
 
   // Delivery details: same fields as the frontend CheckoutValues
-  customerName  String
-  customerPhone String
-  upazila       String
-  union         String
-  ward          Int?
-  address       String
-  note          String?
+  customerName   String
+  customerPhone  String
+  upazila        String
+  union          String
+  ward           Int?
+  address        String
+  note           String?
 
-  subtotal      Int
-  deliveryFee   Int                  @default(0)
-  total         Int
-  paymentMethod PaymentMethod        @default(COD)
-  status        OrderStatus          @default(PENDING)
+  subtotal       Int
+  deliveryFee    Int                  @default(0)
+  discount       Int                  @default(0)
+  total          Int
+  paymentMethod  PaymentMethod        @default(COD)
+  paymentStatus  PaymentStatus        @default(PENDING)
+  status         OrderStatus          @default(PENDING)
 
-  createdAt     TimestamptzString(6) @default(now())
-  updatedAt     TimestamptzString(6) @default(now())
-  items         OrderItem[]
+  // Random key sent by the browser for each checkout attempt. A repeat of the same key
+  // returns the first order instead of making a second one. Null for old orders.
+  idempotencyKey String?              @unique
+
+  createdAt      TimestamptzString(6) @default(now())
+  updatedAt      TimestamptzString(6) @default(now())
+  items          OrderItem[]
+  history        OrderStatusHistory[]
+  payments       Payment[]
+  delivery       Delivery?
+  commission     CommissionRecord?
 }
 
 // A snapshot of what was bought. Name and price are COPIED at order time,
@@ -127,9 +158,175 @@ enum PaymentMethod {
 enum OrderStatus {
   PENDING
   CONFIRMED
+  PROCESSING
+  READY_FOR_DELIVERY
+  SHIPPED
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  COLLECTED
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum DeliveryMethod {
+  PLATFORM_RIDER
+  SELLER
+  PICKUP
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  ACCEPTED
+  PICKED_UP
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum RiderVerification {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum CommissionStatus {
+  PENDING
+  EARNED
+  SETTLED
+  REVERSED
+}
+
+// ---------- Step 2: multi-seller orders, money, delivery ----------
+
+// One checkout. Holds the totals the customer sees; each seller gets their own Order inside it.
+model OrderGroup {
+  id                Int                  @id @default(autoincrement())
+  groupNumber       String               @unique // what the customer sees, e.g. "AH-20261018-483920"
+  userId            Int? // null = guest checkout
+  user              User?                @relation(fields: [userId], references: [id])
+  customerName      String
+  customerPhone     String
+  subtotal          Int
+  deliveryFee       Int                  @default(0)
+  discount          Int                  @default(0)
+  total             Int
+  paymentMethod     PaymentMethod        @default(COD)
+  idempotencyKey    String?              @unique
+  trackingTokenHash String?              @unique // only a hash of the guest tracking token is stored
+  createdAt         TimestamptzString(6) @default(now())
+  updatedAt         TimestamptzString(6) @default(now())
+  orders            Order[]
+}
+
+// Every status change of a seller order. The actor columns are plain numbers on purpose:
+// history must stay even if a user is removed later.
+model OrderStatusHistory {
+  id              Int                  @id @default(autoincrement())
+  orderId         Int
+  order           Order                @relation(fields: [orderId], references: [id])
+  fromStatus      OrderStatus?
+  toStatus        OrderStatus
+  changedByUserId Int?
+  changedByRole   String?
+  note            String?
+  createdAt       TimestamptzString(6) @default(now())
+}
+
+// COD collection now, online payments later.
+model Payment {
+  id                Int                   @id @default(autoincrement())
+  orderId           Int
+  order             Order                 @relation(fields: [orderId], references: [id])
+  method            PaymentMethod         @default(COD)
+  status            PaymentStatus         @default(PENDING)
+  amount            Int
+  collectedAt       TimestamptzString(6)?
+  collectedByUserId Int?
+  reference         String?
+  createdAt         TimestamptzString(6)  @default(now())
+  updatedAt         TimestamptzString(6)  @default(now())
+}
+
+// The marketplace's cut of one seller order.
+model CommissionRecord {
+  id          Int                  @id @default(autoincrement())
+  orderId     Int                  @unique
+  order       Order                @relation(fields: [orderId], references: [id])
+  sellerId    Int
+  seller      Seller               @relation(fields: [sellerId], references: [id])
+  basisAmount Int // the amount the rate was applied to
+  rateBps     Int // 100 = 1%
+  amount      Int
+  status      CommissionStatus     @default(PENDING)
+  createdAt   TimestamptzString(6) @default(now())
+  updatedAt   TimestamptzString(6) @default(now())
+}
+
+model RiderProfile {
+  id                 Int                  @id @default(autoincrement())
+  userId             Int                  @unique
+  user               User                 @relation(fields: [userId], references: [id])
+  verificationStatus RiderVerification    @default(PENDING)
+  isAvailable        Boolean              @default(false)
+  vehicleType        String?
+  createdAt          TimestamptzString(6) @default(now())
+  updatedAt          TimestamptzString(6) @default(now())
+  deliveries         Delivery[]
+}
+
+// One delivery per seller order. riderId is empty for seller delivery and customer pickup.
+model Delivery {
+  id          Int                   @id @default(autoincrement())
+  orderId     Int                   @unique
+  order       Order                 @relation(fields: [orderId], references: [id])
+  method      DeliveryMethod
+  status      DeliveryStatus        @default(PENDING)
+  riderId     Int?
+  rider       RiderProfile?         @relation(fields: [riderId], references: [id])
+  charge      Int                   @default(0)
+  assignedAt  TimestamptzString(6)?
+  pickedUpAt  TimestamptzString(6)?
+  deliveredAt TimestamptzString(6)?
+  note        String?
+  createdAt   TimestamptzString(6)  @default(now())
+  updatedAt   TimestamptzString(6)  @default(now())
+}
+
+model Address {
+  id        Int                  @id @default(autoincrement())
+  userId    Int
+  user      User                 @relation(fields: [userId], references: [id])
+  label     String? // "Home", "Shop"
+  name      String
+  phone     String
+  upazila   String
+  union     String
+  ward      Int?
+  address   String
+  note      String?
+  isDefault Boolean              @default(false)
+  createdAt TimestamptzString(6) @default(now())
+  updatedAt TimestamptzString(6) @default(now())
+}
+
+// Admin and money actions. No relations on purpose: the log must outlive users and orders.
+model AuditLog {
+  id          Int                  @id @default(autoincrement())
+  actorUserId Int?
+  actorRole   String?
+  action      String // "ORDER_STATUS_CHANGED"
+  entityType  String // "Order"
+  entityId    String?
+  details     String? // JSON written as text
+  createdAt   TimestamptzString(6) @default(now())
 }
 
 // ---------- Reviews, FAQ, testimonials (phase 4) ----------

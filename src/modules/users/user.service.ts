@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { db } from "../../prisma/db.js";
 import { generateToken } from "../../utils/jwt.js";
+import { timestamp } from "../../utils/http.js";
 
 
 
@@ -37,6 +38,17 @@ const getUser = async () => {
         success: true,
         data: users,
     };
+};
+
+const updateUserStatus = async (userId: number, status: "ACTIVE" | "INACTIVE" | "SUSPENDED", actorId: number) => {
+    const target = await db.orm.public.User.where({ id: userId }).select("id", "role").first();
+    if (!target) throw new Error("USER_NOT_FOUND");
+    if (target.role === "ADMIN" || userId === actorId) throw new Error("USER_STATUS_FORBIDDEN");
+    const updated = await db.orm.public.User.where({ id: userId })
+        .select("id", "name", "email", "phone", "role", "status", "createdAt", "updatedAt")
+        .update({ status, updatedAt: timestamp() });
+    if (!updated) throw new Error("USER_NOT_FOUND");
+    return { success: true, data: updated };
 };
 
 
@@ -275,6 +287,7 @@ const updateMyProfile = async (
 
 export const userService = {
     getUser,
+    updateUserStatus,
     registerUser,
     loginUser,
     getUserById,

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/prisma/seed.ts",
+    "admin:promote": "tsx scripts/manage-seller.ts promote-admin",
+    "seller:approve": "tsx scripts/manage-seller.ts approve-seller",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",

@@ -19,6 +19,24 @@ const getUser = async (_req: Request, res: Response) => {
     }
 };
 
+const updateUserStatus = async (req: AuthenticatedRequest, res: Response) => {
+    const id = Number(req.params["id"]);
+    const status = req.body?.status;
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ success: false, message: "Invalid user id" });
+    if (status !== "ACTIVE" && status !== "INACTIVE" && status !== "SUSPENDED") {
+        return res.status(400).json({ success: false, message: "status must be ACTIVE, INACTIVE, or SUSPENDED" });
+    }
+    if (typeof req.userId !== "number") return res.status(401).json({ success: false, message: "Authentication required" });
+    try {
+        return res.status(200).json(await userService.updateUserStatus(id, status, req.userId));
+    } catch (error) {
+        if (error instanceof Error && error.message === "USER_NOT_FOUND") return res.status(404).json({ success: false, message: "User not found" });
+        if (error instanceof Error && error.message === "USER_STATUS_FORBIDDEN") return res.status(403).json({ success: false, message: "Admin accounts and your own account cannot be changed here" });
+        console.error("Failed to update user status:", error);
+        return res.status(500).json({ success: false, message: "Failed to update user status" });
+    }
+};
+
 
 const getMyProfile = async (
     req: AuthenticatedRequest,
@@ -306,6 +324,7 @@ const loginUser = async (req: Request, res: Response) => {
 
 export const userController = {
     getUser,
+    updateUserStatus,
     registerUser,
     loginUser,
     getMyProfile,

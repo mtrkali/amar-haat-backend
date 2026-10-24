@@ -7,7 +7,7 @@ export const SELLER_STATUSES: SellerStatus[] = ["PENDING", "APPROVED", "SUSPENDE
 
 export class SellerError extends Error {
     constructor(
-        public code: "ALREADY_APPLIED" | "SELLER_NOT_FOUND" | "USER_NOT_FOUND",
+        public code: "ALREADY_APPLIED" | "SELLER_NOT_FOUND" | "USER_NOT_FOUND" | "SELLER_NOT_APPROVED" | "PRODUCT_NOT_FOUND",
         message: string
     ) {
         super(message);
@@ -77,6 +77,60 @@ const getMyShop = async (userId: number) => {
     return { success: true, data: seller };
 };
 
+const getApprovedShopForUser = async (userId: number) => {
+    const seller = await db.orm.public.Seller.where({ userId }).select(...SELLER_FIELDS).first();
+    if (!seller) throw new SellerError("SELLER_NOT_FOUND", "You do not have a shop yet");
+    if (seller.status !== "APPROVED") throw new SellerError("SELLER_NOT_APPROVED", "Your shop is not approved");
+    return seller;
+};
+
+const getDashboard = async (userId: number) => {
+    const seller = await getApprovedShopForUser(userId);
+    const products = await db.orm.public.Product.where({ sellerId: seller.id })
+        .select("id", "slug", "name", "price", "stock", "isActive", "updatedAt")
+        .all();
+    const orders = await db.orm.public.Order.where({ sellerId: seller.id })
+        .select("id", "orderNumber", "groupId", "customerName", "customerPhone", "subtotal", "deliveryFee", "total", "status", "createdAt")
+        .all();
+    const newestOrders = [...orders].sort((a, b) => new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime());
+    const orderDetails = await Promise.all(newestOrders.map(async (order) => ({
+        ...order,
+        items: await db.orm.public.OrderItem.where({ orderId: order.id })
+            .select("id", "productName", "unitPrice", "quantity", "lineTotal")
+            .all(),
+    })));
+
+    return {
+        success: true,
+        data: {
+            shop: seller,
+            overview: {
+                totalProducts: products.length,
+                activeProducts: products.filter((product) => product.isActive).length,
+                lowStockProducts: products.filter((product) => product.stock > 0 && product.stock <= 5).length,
+                outOfStockProducts: products.filter((product) => product.stock === 0).length,
+                totalOrders: orders.length,
+                pendingOrders: orders.filter((order) => order.status === "PENDING").length,
+                deliveredOrders: orders.filter((order) => order.status === "DELIVERED").length,
+                deliveredSales: orders.filter((order) => order.status === "DELIVERED").reduce((sum, order) => sum + order.subtotal, 0),
+            },
+            products,
+            orders: orderDetails,
+        },
+    };
+};
+
+const updateMyProductStock = async (userId: number, productId: number, stock: number) => {
+    const seller = await getApprovedShopForUser(userId);
+    const product = await db.orm.public.Product.where({ id: productId, sellerId: seller.id }).select("id").first();
+    if (!product) throw new SellerError("PRODUCT_NOT_FOUND", "Product not found");
+    await db.orm.public.Product.where({ id: productId, sellerId: seller.id }).select("id").update({ stock, updatedAt: timestamp() });
+    const updated = await db.orm.public.Product.where({ id: productId, sellerId: seller.id })
+        .select("id", "slug", "name", "price", "stock", "isActive", "updatedAt")
+        .first();
+    return { success: true, data: updated };
+};
+
 // Admin: all shops.
 const listSellers = async () => {
     const sellers = await db.orm.public.Seller
@@ -122,6 +176,8 @@ const updateSellerStatus = async (sellerId: number, status: SellerStatus) => {
 export const sellerService = {
     applyForShop,
     getMyShop,
+    getDashboard,
+    updateMyProductStock,
     listSellers,
     updateSellerStatus,
 };

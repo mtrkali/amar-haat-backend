@@ -7,6 +7,8 @@ const router = express.Router();
 // Any logged-in user can apply for a shop and check their own application.
 router.post("/apply", authenticate(), sellerController.applyForShop);
 router.get("/me", authenticate(), sellerController.getMyShop);
+router.get("/dashboard", authenticate("SELLER"), sellerController.getDashboard);
+router.patch("/products/:id/stock", authenticate("SELLER"), sellerController.updateProductStock);
 
 // Admin only.
 router.get("/", authenticate("ADMIN"), sellerController.listSellers);

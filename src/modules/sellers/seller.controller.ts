@@ -7,6 +7,7 @@ const sendSellerError = (error: unknown, res: Response, fallback: string) => {
     if (error instanceof SellerError) {
         const status =
             error.code === "ALREADY_APPLIED" ? 409
+                : error.code === "SELLER_NOT_APPROVED" ? 403
                 : 404; // SELLER_NOT_FOUND, USER_NOT_FOUND
 
         return res.status(status).json({
@@ -60,6 +61,30 @@ const getMyShop = async (req: AuthenticatedRequest, res: Response) => {
     }
 };
 
+const getDashboard = async (req: AuthenticatedRequest, res: Response) => {
+    if (typeof req.userId !== "number") return res.status(401).json({ success: false, message: "Authentication required" });
+    try {
+        return res.status(200).json(await sellerService.getDashboard(req.userId));
+    } catch (error) {
+        return sendSellerError(error, res, "Failed to fetch seller dashboard");
+    }
+};
+
+const updateProductStock = async (req: AuthenticatedRequest, res: Response) => {
+    if (typeof req.userId !== "number") return res.status(401).json({ success: false, message: "Authentication required" });
+    const productId = Number(req.params["id"]);
+    const stock: unknown = req.body?.stock;
+    if (!Number.isInteger(productId) || productId < 1) return res.status(400).json({ success: false, message: "Invalid product id" });
+    if (typeof stock !== "number" || !Number.isInteger(stock) || stock < 0 || stock > 1_000_000) {
+        return res.status(400).json({ success: false, message: "Stock must be a whole number from 0 to 1000000" });
+    }
+    try {
+        return res.status(200).json({ ...await sellerService.updateMyProductStock(req.userId, productId, stock), message: "Stock updated" });
+    } catch (error) {
+        return sendSellerError(error, res, "Failed to update stock");
+    }
+};
+
 const listSellers = async (_req: Request, res: Response) => {
     try {
         return res.status(200).json(await sellerService.listSellers());
@@ -95,6 +120,8 @@ const updateSellerStatus = async (req: Request, res: Response) => {
 export const sellerController = {
     applyForShop,
     getMyShop,
+    getDashboard,
+    updateProductStock,
     listSellers,
     updateSellerStatus,
 };

@@ -8,6 +8,7 @@ const sendSellerError = (error: unknown, res: Response, fallback: string) => {
         const status =
             error.code === "ALREADY_APPLIED" ? 409
                 : error.code === "SELLER_NOT_APPROVED" ? 403
+                    : error.code === "INVALID_COMMISSION_RATE" ? 400
                 : 404; // SELLER_NOT_FOUND, USER_NOT_FOUND
 
         return res.status(status).json({
@@ -117,6 +118,15 @@ const updateSellerStatus = async (req: Request, res: Response) => {
     }
 };
 
+const updateCommissionRate = async (req: Request, res: Response) => {
+    const id = Number(req.params["id"]);
+    const raw: unknown = req.body?.commissionBps;
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ success: false, message: "Invalid shop id" });
+    if (raw !== null && (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > 10000)) return res.status(400).json({ success: false, message: "commissionBps must be null or a whole number from 0 to 10000" });
+    try { return res.json(await sellerService.updateCommissionRate(id, raw as number | null)); }
+    catch (error) { return sendSellerError(error, res, "Failed to update commission rate"); }
+};
+
 export const sellerController = {
     applyForShop,
     getMyShop,
@@ -124,4 +134,5 @@ export const sellerController = {
     updateProductStock,
     listSellers,
     updateSellerStatus,
+    updateCommissionRate,
 };

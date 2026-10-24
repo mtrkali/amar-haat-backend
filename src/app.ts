@@ -8,6 +8,7 @@ import { productRoute } from "./modules/products/product.router.js";
 import { orderRoute } from "./modules/orders/order.router.js";
 import { sellerRoute } from "./modules/sellers/seller.router.js";
 import { deliveryRoute } from "./modules/delivery/delivery.router.js";
+import { financeRoute } from "./modules/finance/finance.router.js";
 import { productReviewRoute, reviewAdminRoute } from "./modules/reviews/review.router.js";
 import { faqRoute, testimonialRoute } from "./modules/contents/content.router.js";
 import {
@@ -65,6 +66,7 @@ app.use("/testimonials", testimonialRoute);
 app.use("/orders", orderRoute);
 app.use("/sellers", sellerRoute);
 app.use("/delivery", deliveryRoute);
+app.use("/finance", financeRoute);
 
 // These two must stay last.
 app.use(notFoundHandler);

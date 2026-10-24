@@ -1,6 +1,7 @@
 import { db } from "../../prisma/db.js";
 import { timestamp } from "../../utils/http.js";
 import { query, INT, TEXT } from "../../prisma/sql.js";
+import { financeService } from "../finance/finance.service.js";
 
 export type SellerStatus = "PENDING" | "APPROVED" | "SUSPENDED";
 
@@ -8,7 +9,7 @@ export const SELLER_STATUSES: SellerStatus[] = ["PENDING", "APPROVED", "SUSPENDE
 
 export class SellerError extends Error {
     constructor(
-        public code: "ALREADY_APPLIED" | "SELLER_NOT_FOUND" | "USER_NOT_FOUND" | "SELLER_NOT_APPROVED" | "PRODUCT_NOT_FOUND",
+        public code: "ALREADY_APPLIED" | "SELLER_NOT_FOUND" | "USER_NOT_FOUND" | "SELLER_NOT_APPROVED" | "PRODUCT_NOT_FOUND" | "INVALID_COMMISSION_RATE",
         message: string
     ) {
         super(message);
@@ -16,7 +17,7 @@ export class SellerError extends Error {
     }
 }
 
-const SELLER_FIELDS = ["id", "userId", "slug", "shopName", "imageUrl", "status"] as const;
+const SELLER_FIELDS = ["id", "userId", "slug", "shopName", "imageUrl", "status", "commissionBps"] as const;
 
 const isUniqueViolation = (error: unknown): boolean =>
     typeof error === "object" &&
@@ -100,6 +101,7 @@ const getDashboard = async (userId: number) => {
             .select("id", "productName", "unitPrice", "quantity", "lineTotal")
             .all(),
     })));
+    const financial = await financeService.getSellerSummary(userId);
 
     return {
         success: true,
@@ -115,6 +117,7 @@ const getDashboard = async (userId: number) => {
                 deliveredOrders: orders.filter((order) => order.status === "DELIVERED").length,
                 deliveredSales: orders.filter((order) => order.status === "DELIVERED").reduce((sum, order) => sum + order.subtotal, 0),
             },
+            financialSummary: financial.data,
             products: products.map(({ deliveryMethods, ...product }) => ({ ...product, deliveryMethods: JSON.parse(deliveryMethods) as string[] })),
             orders: orderDetails,
         },
@@ -174,6 +177,16 @@ const updateSellerStatus = async (sellerId: number, status: SellerStatus) => {
     return { success: true, data: await getSellerById(sellerId) };
 };
 
+const updateCommissionRate = async (sellerId: number, commissionBps: number | null) => {
+    if (commissionBps !== null && (!Number.isInteger(commissionBps) || commissionBps < 0 || commissionBps > 10000)) {
+        throw new SellerError("INVALID_COMMISSION_RATE", "Commission rate must be from 0% to 100%");
+    }
+    const seller = await db.orm.public.Seller.where({ id: sellerId }).select("id").first();
+    if (!seller) throw new SellerError("SELLER_NOT_FOUND", "Shop not found");
+    await db.orm.public.Seller.where({ id: sellerId }).select("id").update({ commissionBps });
+    return { success: true, data: await db.orm.public.Seller.where({ id: sellerId }).select("id", "shopName", "commissionBps").first() };
+};
+
 export const sellerService = {
     applyForShop,
     getMyShop,
@@ -181,4 +194,5 @@ export const sellerService = {
     updateMyProductStock,
     listSellers,
     updateSellerStatus,
+    updateCommissionRate,
 };

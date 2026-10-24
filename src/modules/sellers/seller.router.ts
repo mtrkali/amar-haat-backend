@@ -13,5 +13,6 @@ router.patch("/products/:id/stock", authenticate("SELLER"), sellerController.upd
 // Admin only.
 router.get("/", authenticate("ADMIN"), sellerController.listSellers);
 router.patch("/:id/status", authenticate("ADMIN"), sellerController.updateSellerStatus);
+router.patch("/:id/commission", authenticate("ADMIN"), sellerController.updateCommissionRate);
 
 export const sellerRoute = router;

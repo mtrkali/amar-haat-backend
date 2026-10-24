@@ -286,7 +286,7 @@ const insertOrderAtomically = async (
                 ${input.union}::text, ${int(input.ward)}::int, ${input.address}::text, ${text(input.note)}::text,
                 totals.subtotal, totals.fee, 0, totals.subtotal + totals.fee, 'COD', 'PENDING', 'PENDING'
             FROM totals CROSS JOIN grp
-            RETURNING id, "sellerId"
+            RETURNING id, "sellerId", subtotal, "deliveryFee", total
         ),
         deliveries AS (
             INSERT INTO "Delivery" ("orderId", method, status, charge, "updatedAt")
@@ -298,6 +298,21 @@ const insertOrderAtomically = async (
             INSERT INTO "OrderItem" ("orderId", "productId", "productName", "unitPrice", "quantity", "lineTotal")
             SELECT ord.id, u."productId", u."productName", u."unitPrice", u.quantity, u."unitPrice" * u.quantity
             FROM ord JOIN upd u ON u."sellerId" IS NOT DISTINCT FROM ord."sellerId"
+            RETURNING id
+        ),
+        payments AS (
+            INSERT INTO "Payment" ("orderId", method, status, amount, "updatedAt")
+            SELECT id, 'COD', 'PENDING', total, now() FROM ord
+            RETURNING id
+        ),
+        commissions AS (
+            INSERT INTO "CommissionRecord" ("orderId", "sellerId", "basisAmount", "rateBps", amount, status, "updatedAt")
+            SELECT ord.id, ord."sellerId", basis.amount,
+                COALESCE(s."commissionBps", ${businessConfig.commission.rateBps}::int),
+                ROUND(basis.amount::numeric * COALESCE(s."commissionBps", ${businessConfig.commission.rateBps}::int)::numeric / 10000)::int,
+                'PENDING', now()
+            FROM ord JOIN "Seller" s ON s.id=ord."sellerId"
+            CROSS JOIN LATERAL (SELECT ${businessConfig.commission.basis === "SUBTOTAL_PLUS_DELIVERY" ? 'ord.subtotal + ord."deliveryFee"' : "ord.subtotal"}::int AS amount) basis
             RETURNING id
         )
         SELECT id AS "groupId" FROM grp
@@ -483,7 +498,9 @@ const updateOrderStatus = async (orderId: number, newStatus: OrderStatus) => {
     const rows = await query<{ changed: number }>({ changed: INT })`
         WITH upd AS (
             UPDATE "Order"
-            SET status = ${newStatus}::text, "updatedAt" = now()
+            SET status = ${newStatus}::text,
+                "paymentStatus" = CASE WHEN ${newStatus}::text='CANCELLED' AND "paymentStatus"='PENDING' THEN 'FAILED' ELSE "paymentStatus" END,
+                "updatedAt" = now()
             WHERE id = ${orderId}::int AND status = ${current}::text
             RETURNING id
         ),
@@ -500,6 +517,21 @@ const updateOrderStatus = async (orderId: number, newStatus: OrderStatus) => {
             FROM back b
             WHERE p.id = b."productId"
             RETURNING p.id
+        ),
+        payment_cancel AS (
+            UPDATE "Payment" p SET status='FAILED', reference=COALESCE(p.reference, 'Order cancelled'), "updatedAt"=now()
+            FROM upd WHERE p."orderId"=upd.id AND ${newStatus}::text='CANCELLED' AND p.status='PENDING'
+            RETURNING p.id
+        ),
+        delivery_cancel AS (
+            UPDATE "Delivery" d SET status='CANCELLED', "updatedAt"=now()
+            FROM upd WHERE d."orderId"=upd.id AND ${newStatus}::text='CANCELLED' AND d.status NOT IN ('DELIVERED','CANCELLED')
+            RETURNING d.id
+        ),
+        commissions AS (
+            UPDATE "CommissionRecord" c SET status=CASE WHEN ${newStatus}::text='DELIVERED' THEN 'EARNED' ELSE 'REVERSED' END, "updatedAt"=now()
+            FROM upd WHERE c."orderId"=upd.id AND ${newStatus}::text IN ('DELIVERED','CANCELLED') AND c.status='PENDING'
+            RETURNING c.id
         )
         SELECT (SELECT count(*) FROM upd)::int AS changed
     `;

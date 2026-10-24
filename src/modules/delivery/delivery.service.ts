@@ -99,6 +99,9 @@ const setDeliveryStatus = async (userId: number, deliveryId: number, status: Del
         ), ord AS (
             UPDATE "Order" o SET status=CASE WHEN ${status}::text='PICKED_UP' THEN 'OUT_FOR_DELIVERY' WHEN ${status}::text='DELIVERED' THEN 'DELIVERED' ELSE o.status END, "updatedAt"=now()
             FROM changed WHERE o.id=changed."orderId" AND ${status}::text IN ('PICKED_UP','DELIVERED') RETURNING o.id
+        ), commission_update AS (
+            UPDATE "CommissionRecord" c SET status='EARNED', "updatedAt"=now()
+            FROM ord WHERE c."orderId"=ord.id AND ${status}::text='DELIVERED' AND c.status='PENDING' RETURNING c.id
         ) SELECT id FROM changed
     `;
     return rows[0] ? { success: true } : null;

@@ -10,7 +10,7 @@ const sendOrderError = (error: unknown, res: Response, fallback: string) => {
     if (error instanceof OrderError) {
         const status =
             error.code === "ORDER_NOT_FOUND" ? 404
-                : error.code === "OUT_OF_STOCK" || error.code === "INVALID_TRANSITION" ? 409
+            : error.code === "OUT_OF_STOCK" || error.code === "INVALID_TRANSITION" || error.code === "DELIVERY_METHOD_UNAVAILABLE" ? 409
                     : 400;
 
         return res.status(status).json({

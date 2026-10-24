@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, randomInt } from "node:crypto";
 import { db } from "../../prisma/db.js";
-import { query, sqlState, INT, int, text } from "../../prisma/sql.js";
+import { query, sqlState, INT, TEXT, int, text } from "../../prisma/sql.js";
 import { businessConfig } from "../../config/business.js";
 import type { ValidatedOrder } from "./order.validation.js";
 import { normalizePhone } from "./order.validation.js";
@@ -34,7 +34,8 @@ export class OrderError extends Error {
             | "PRODUCT_UNAVAILABLE"
             | "OUT_OF_STOCK"
             | "ORDER_NOT_FOUND"
-            | "INVALID_TRANSITION",
+            | "INVALID_TRANSITION"
+            | "DELIVERY_METHOD_UNAVAILABLE",
         message: string
     ) {
         super(message);
@@ -191,8 +192,36 @@ const insertOrderAtomically = async (
     const requested = JSON.stringify(
         input.items.map((item) => ({ slug: item.productSlug, qty: item.quantity }))
     );
-
-    const fee = businessConfig.deliveryFee;
+    const products = await query<{ slug: string; sellerId: number | null; methods: string }>({ slug: TEXT, sellerId: { codecId: INT, nullable: true }, methods: TEXT })`
+        SELECT p.slug, p."sellerId", array_to_json(p."deliveryMethods")::text AS methods FROM jsonb_array_elements_text(${JSON.stringify(input.items.map((item) => item.productSlug))}::jsonb) AS req(value) JOIN "Product" p ON p.slug=req.value
+    `;
+    const settings = await query<{ method: string; enabled: boolean; fee: number }>({ method: "pg/text@1", enabled: "pg/bool@1", fee: INT })`
+        SELECT method, enabled, fee FROM "DeliveryMethodSetting"
+    `;
+    const sellers = new Map<string, { sellerId: number | null; methods: Set<string> }>();
+    for (const product of products) {
+        const key = String(product.sellerId);
+        const current = sellers.get(key);
+        let productMethods: string[] = ["SELLER"];
+        try { productMethods = JSON.parse(product.methods) as string[]; } catch { /* safe legacy default */ }
+        const supported = new Set(productMethods);
+        if (current) current.methods = new Set([...current.methods].filter((method) => supported.has(method)));
+        else sellers.set(key, { sellerId: product.sellerId, methods: supported });
+    }
+    const supplied = new Map(input.deliveryChoices.map((choice) => [String(choice.sellerId), choice.method]));
+    const choices: Array<{ sellerId: number | null; method: string; fee: number }> = [];
+    for (const seller of sellers.values()) {
+        if (supplied.size > 0 && !supplied.has(String(seller.sellerId))) throw new OrderError("DELIVERY_METHOD_UNAVAILABLE", "Choose one delivery method for each seller");
+        const requestedMethod = supplied.get(String(seller.sellerId));
+        const selected = requestedMethod ?? settings.find((setting) => setting.enabled && seller.methods.has(setting.method))?.method;
+        const setting = settings.find((row) => row.method === selected && row.enabled);
+        if (!selected || !setting || !seller.methods.has(selected)) {
+            throw new OrderError("DELIVERY_METHOD_UNAVAILABLE", "A delivery method is unavailable for one of the sellers");
+        }
+        choices.push({ sellerId: seller.sellerId, method: selected, fee: setting.fee });
+    }
+    if (supplied.size !== 0 && (supplied.size !== choices.length || [...supplied.keys()].some((key) => !sellers.has(key)))) throw new OrderError("DELIVERY_METHOD_UNAVAILABLE", "Choose one delivery method for each seller");
+    const choiceJson = JSON.stringify(choices);
     const trackingToken = trackingTokenForAttempt(idempotencyKey);
     const trackingTokenHash = hashTrackingToken(trackingToken);
 
@@ -201,6 +230,9 @@ const insertOrderAtomically = async (
             SELECT x.slug, SUM(x.qty)::int AS qty
             FROM jsonb_to_recordset(${requested}::jsonb) AS x(slug text, qty int)
             GROUP BY x.slug
+        ),
+        choices AS (
+            SELECT x."sellerId", x.method, x.fee FROM jsonb_to_recordset(${choiceJson}::jsonb) AS x("sellerId" int, method text, fee int)
         ),
         upd AS (
             UPDATE "Product" p
@@ -211,14 +243,24 @@ const insertOrderAtomically = async (
         ),
         guard AS MATERIALIZED (
             SELECT 1 / CASE
-                WHEN (SELECT count(*) FROM upd) = (SELECT count(*) FROM req) THEN 1
+                WHEN (SELECT count(*) FROM upd) = (SELECT count(*) FROM req)
+                    AND (SELECT count(*) FROM choices) = (SELECT count(DISTINCT COALESCE("sellerId", 0)) FROM upd)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM upd u JOIN choices c ON c."sellerId" IS NOT DISTINCT FROM u."sellerId"
+                        JOIN "Product" p ON p.id=u."productId" WHERE NOT (c.method = ANY(p."deliveryMethods"))
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM choices c WHERE NOT EXISTS (
+                            SELECT 1 FROM "DeliveryMethodSetting" s WHERE s.method=c.method AND s.enabled=true AND s.fee=c.fee
+                        )
+                    ) THEN 1
                 ELSE 0
             END AS ok
         ),
         totals AS MATERIALIZED (
-            SELECT u."sellerId", SUM(u."unitPrice" * u.quantity)::int AS subtotal
-            FROM upd u CROSS JOIN guard g
-            GROUP BY u."sellerId"
+            SELECT u."sellerId", SUM(u."unitPrice" * u.quantity)::int AS subtotal, c.method, c.fee
+            FROM upd u CROSS JOIN guard g JOIN choices c ON c."sellerId" IS NOT DISTINCT FROM u."sellerId"
+            GROUP BY u."sellerId", c.method, c.fee
         ),
         grp AS (
             INSERT INTO "OrderGroup" (
@@ -228,8 +270,8 @@ const insertOrderAtomically = async (
             SELECT ${makeGroupNumber()}::text, ${int(userId)}::int, ${input.customerName}::text,
                 ${input.customerPhone}::text,
                 (SELECT COALESCE(SUM(subtotal), 0)::int FROM totals),
-                (SELECT COUNT(*)::int * ${fee}::int FROM totals), 0,
-                (SELECT COALESCE(SUM(subtotal), 0)::int + COUNT(*)::int * ${fee}::int FROM totals),
+                (SELECT COALESCE(SUM(fee), 0)::int FROM totals), 0,
+                (SELECT COALESCE(SUM(subtotal + fee), 0)::int FROM totals),
                 'COD', ${text(idempotencyKey)}::text, ${trackingTokenHash}::text
             RETURNING id
         ),
@@ -242,9 +284,15 @@ const insertOrderAtomically = async (
             SELECT ('AH-' || to_char(now(), 'YYYYMMDD') || '-' || floor(random() * 900000 + 100000)::text), ${int(userId)}::int, grp.id, totals."sellerId",
                 ${input.customerName}::text, ${input.customerPhone}::text, ${input.upazila}::text,
                 ${input.union}::text, ${int(input.ward)}::int, ${input.address}::text, ${text(input.note)}::text,
-                totals.subtotal, ${fee}::int, 0, totals.subtotal + ${fee}::int, 'COD', 'PENDING', 'PENDING'
+                totals.subtotal, totals.fee, 0, totals.subtotal + totals.fee, 'COD', 'PENDING', 'PENDING'
             FROM totals CROSS JOIN grp
             RETURNING id, "sellerId"
+        ),
+        deliveries AS (
+            INSERT INTO "Delivery" ("orderId", method, status, charge, "updatedAt")
+            SELECT ord.id, totals.method, 'PENDING', totals.fee, now()
+            FROM ord JOIN totals ON totals."sellerId" IS NOT DISTINCT FROM ord."sellerId"
+            RETURNING id
         ),
         items AS (
             INSERT INTO "OrderItem" ("orderId", "productId", "productName", "unitPrice", "quantity", "lineTotal")
@@ -280,6 +328,9 @@ const getGroupById = async (groupId: number, trackingToken?: string | null) => {
                     ? "Amar Haat"
                     : (await db.orm.public.Seller.where({ id: order.sellerId }).select("shopName").first())?.shopName ?? "Seller",
                 items: await getItems(order.id),
+                delivery: (await query<{ method: string; status: string }>({ method: TEXT, status: TEXT })`
+                    SELECT method, status FROM "Delivery" WHERE "orderId"=${order.id}::int LIMIT 1
+                `)[0] ?? null,
             }))),
             ...(trackingToken ? { trackingToken } : {}),
         },

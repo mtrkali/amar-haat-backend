@@ -1,5 +1,6 @@
 import { db } from "../../prisma/db.js";
 import { timestamp } from "../../utils/http.js";
+import { query, INT, TEXT } from "../../prisma/sql.js";
 
 export type SellerStatus = "PENDING" | "APPROVED" | "SUSPENDED";
 
@@ -86,9 +87,9 @@ const getApprovedShopForUser = async (userId: number) => {
 
 const getDashboard = async (userId: number) => {
     const seller = await getApprovedShopForUser(userId);
-    const products = await db.orm.public.Product.where({ sellerId: seller.id })
-        .select("id", "slug", "name", "price", "stock", "isActive", "updatedAt")
-        .all();
+    const products = await query<{ id: number; slug: string; name: string; price: number; stock: number; isActive: boolean; updatedAt: string; deliveryMethods: string }>({ id: INT, slug: TEXT, name: TEXT, price: INT, stock: INT, isActive: "pg/bool@1", updatedAt: TEXT, deliveryMethods: TEXT })`
+        SELECT id, slug, name, price, stock, "isActive", "updatedAt"::text AS "updatedAt", array_to_json("deliveryMethods")::text AS "deliveryMethods" FROM "Product" WHERE "sellerId"=${seller.id}::int
+    `;
     const orders = await db.orm.public.Order.where({ sellerId: seller.id })
         .select("id", "orderNumber", "groupId", "customerName", "customerPhone", "subtotal", "deliveryFee", "total", "status", "createdAt")
         .all();
@@ -114,7 +115,7 @@ const getDashboard = async (userId: number) => {
                 deliveredOrders: orders.filter((order) => order.status === "DELIVERED").length,
                 deliveredSales: orders.filter((order) => order.status === "DELIVERED").reduce((sum, order) => sum + order.subtotal, 0),
             },
-            products,
+            products: products.map(({ deliveryMethods, ...product }) => ({ ...product, deliveryMethods: JSON.parse(deliveryMethods) as string[] })),
             orders: orderDetails,
         },
     };

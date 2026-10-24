@@ -27,6 +27,7 @@ export type ValidatedOrder = {
     address: string;
     note: string | null;
     items: OrderItemInput[];
+    deliveryChoices: { sellerId: number | null; method: "PLATFORM_RIDER" | "SELLER" | "PICKUP" }[];
 };
 
 export type OrderValidationResult =
@@ -153,6 +154,19 @@ export const validateOrderBody = (body: unknown): OrderValidationResult => {
         }
     }
 
+    const deliveryChoices: ValidatedOrder["deliveryChoices"] = [];
+    const rawChoices = body["deliveryChoices"];
+    if (rawChoices !== undefined) {
+        if (!Array.isArray(rawChoices) || rawChoices.length > MAX_DISTINCT_ITEMS) errors["deliveryChoices"] = "Invalid delivery method choices.";
+        else for (const raw of rawChoices) {
+            if (!isRecord(raw) || !(raw["sellerId"] === null || (Number.isInteger(raw["sellerId"]) && (raw["sellerId"] as number) > 0)) || !["PLATFORM_RIDER", "SELLER", "PICKUP"].includes(String(raw["method"]))) {
+                errors["deliveryChoices"] = "Each seller needs a valid delivery method."; break;
+            }
+            if (deliveryChoices.some((x) => x.sellerId === raw["sellerId"])) { errors["deliveryChoices"] = "Duplicate seller delivery choice."; break; }
+            deliveryChoices.push({ sellerId: raw["sellerId"] as number | null, method: raw["method"] as ValidatedOrder["deliveryChoices"][number]["method"] });
+        }
+    }
+
     if (Object.keys(errors).length > 0) {
         return { ok: false, errors };
     }
@@ -171,6 +185,7 @@ export const validateOrderBody = (body: unknown): OrderValidationResult => {
                 productSlug,
                 quantity,
             })),
+            deliveryChoices,
         },
     };
 };

@@ -62,6 +62,13 @@ const getMyShop = async (req: AuthenticatedRequest, res: Response) => {
     }
 };
 
+const getPublicShop = async (req: Request, res: Response) => {
+    const slug = typeof req.params["slug"] === "string" ? req.params["slug"].trim() : "";
+    if (!slug || slug.length > 100) return res.status(404).json({ success: false, message: "Shop not found" });
+    try { return res.status(200).json(await sellerService.getPublicShop(slug)); }
+    catch (error) { return sendSellerError(error, res, "Failed to fetch shop"); }
+};
+
 const getDashboard = async (req: AuthenticatedRequest, res: Response) => {
     if (typeof req.userId !== "number") return res.status(401).json({ success: false, message: "Authentication required" });
     try {
@@ -130,6 +137,7 @@ const updateCommissionRate = async (req: Request, res: Response) => {
 export const sellerController = {
     applyForShop,
     getMyShop,
+    getPublicShop,
     getDashboard,
     updateProductStock,
     listSellers,

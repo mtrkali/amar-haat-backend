@@ -4,6 +4,8 @@ import { authenticate } from "../../middleware/auth.middleware.js";
 
 const router = express.Router();
 
+router.get("/public/:slug", sellerController.getPublicShop);
+
 // Any logged-in user can apply for a shop and check their own application.
 router.post("/apply", authenticate(), sellerController.applyForShop);
 router.get("/me", authenticate(), sellerController.getMyShop);

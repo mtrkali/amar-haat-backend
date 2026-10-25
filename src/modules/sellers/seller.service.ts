@@ -79,6 +79,18 @@ const getMyShop = async (userId: number) => {
     return { success: true, data: seller };
 };
 
+// Public storefront: expose only approved shop details and active products.
+const getPublicShop = async (slug: string) => {
+    const seller = await db.orm.public.Seller.where({ slug, status: "APPROVED" })
+        .select("id", "slug", "shopName", "imageUrl")
+        .first();
+    if (!seller) throw new SellerError("SELLER_NOT_FOUND", "Shop not found");
+    const products = await db.orm.public.Product.where({ sellerId: seller.id, isActive: true })
+        .select("id", "slug", "name", "price", "stock", "description", "imageUrl", "categoryId")
+        .all();
+    return { success: true, data: { ...seller, products } };
+};
+
 const getApprovedShopForUser = async (userId: number) => {
     const seller = await db.orm.public.Seller.where({ userId }).select(...SELLER_FIELDS).first();
     if (!seller) throw new SellerError("SELLER_NOT_FOUND", "You do not have a shop yet");
@@ -190,6 +202,7 @@ const updateCommissionRate = async (sellerId: number, commissionBps: number | nu
 export const sellerService = {
     applyForShop,
     getMyShop,
+    getPublicShop,
     getDashboard,
     updateMyProductStock,
     listSellers,

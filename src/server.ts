@@ -1,22 +1,24 @@
+import "dotenv/config";
 import dns from "node:dns";
-import dotenv from "dotenv";
+import { isIP } from "node:net";
 import app from "./app.js";
 
 // DNS servers. Some home networks cannot resolve the Neon database host, so local development
 // keeps using Google DNS as before. In production (Render) the platform DNS is used, unless
 // DNS_SERVERS is set, for example DNS_SERVERS="8.8.8.8,8.8.4.4".
-const customDns = process.env["DNS_SERVERS"]
+const rawDns = process.env["DNS_SERVERS"]
     ?.split(",")
     .map((server) => server.trim())
-    .filter(Boolean);
+    .filter((server) => server.length > 0);
+const customDnsIsValid = Boolean(rawDns?.length) && rawDns!.every((server) => isIP(server) !== 0);
 
-if (customDns && customDns.length > 0) {
-    dns.setServers(customDns);
+if (customDnsIsValid) {
+    dns.setServers(rawDns!);
+} else if (rawDns?.length) {
+    console.warn("Ignoring DNS_SERVERS because it contains an invalid IP address; using the platform resolver.");
 } else if (process.env["NODE_ENV"] !== "production") {
     dns.setServers(["8.8.8.8", "8.8.4.4"]);
 }
-
-dotenv.config();
 
 // Stop at start-up with a clear message, instead of failing later on the first login or query.
 for (const name of ["DATABASE_URL", "JWT_SECRET"]) {
